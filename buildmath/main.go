@@ -78,7 +78,7 @@ func executor(in string) {
 	switch args[0] {
 	case "build":
 		HowToMakeItem(args[1])
-	case "exit":
+	case "exit", "e", "quit", "q":
 		os.Exit(0)
 	default:
 		log.Println(in)
