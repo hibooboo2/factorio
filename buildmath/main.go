@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 
@@ -77,6 +78,8 @@ func executor(in string) {
 	switch args[0] {
 	case "build":
 		HowToMakeItem(args[1])
+	case "exit":
+		os.Exit(0)
 	default:
 		log.Println(in)
 	}
