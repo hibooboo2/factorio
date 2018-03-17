@@ -8,17 +8,17 @@ import (
 	"io"
 )
 
-func DecodeBluePrint(blueprint []byte) BluePrint {
+func DecodeBluePrint(blueprint []byte) (*BluePrint, error) {
 	buff := make([]byte, 1024*5000)
 	n, err := base64.StdEncoding.Decode(buff, []byte(blueprint[1:]))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	var dec bytes.Buffer
 
 	r, err := zlib.NewReader(bytes.NewReader(buff[:n]))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer r.Close()
 
@@ -27,10 +27,10 @@ func DecodeBluePrint(blueprint []byte) BluePrint {
 	var data BlueprintData
 	err = json.Unmarshal(dec.Bytes(), &data)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return data.Blueprint
+	return &data.Blueprint, nil
 }
 
 func EncodeBluePrint(bluePrint BluePrint) []byte {

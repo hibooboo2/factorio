@@ -111,7 +111,12 @@ func executor(in string) {
 		fmt.Printf("%##v", *b)
 		time.Sleep(time.Millisecond * 20)
 	case "blueprint":
-		out := EncodeBluePrint(DecodeBluePrint([]byte(args[1])))
+		bluePrint, err := DecodeBluePrint([]byte(args[1]))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		out := EncodeBluePrint(*bluePrint)
 		fmt.Println(string(out) == args[1])
 	case "exit", "e", "quit", "q":
 		os.Exit(0)
