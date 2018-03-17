@@ -3,9 +3,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -103,12 +105,14 @@ func executor(in string) {
 			return
 		}
 
-		b, err := BuildItemsPerSecond(numPersecond, toBuild, Assembler{CraftingSpeed: 0.75}, 0)
+		b, err := BuildItemsPerSecond(int64(numPersecond), toBuild, Assembler{CraftingSpeed: 0.75}, 0)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		fmt.Printf("%##v", *b)
+
+		fmt.Println(b)
+
 		time.Sleep(time.Millisecond * 20)
 	case "blueprint":
 		bluePrint, err := DecodeBluePrint([]byte(args[1]))
@@ -136,24 +140,82 @@ func ctrlC(b *prompt.Buffer) {
 }
 
 type Builder struct {
+	Product       IngriedentProduct
 	Assembler     Assembler
 	AssemblerName string
 	Num           int
 	Level         int
-	SubBuilders   []Builder
-	Resources     []IngriedentProduct
+	SubBuilders   []*Builder
+	Resources     []*IngriedentProduct
 }
 
-func BuildItemsPerSecond(ItemsPerSecond int, toBuild Recipe, minAssembler Assembler, level int) (*Builder, error) {
-	//Tree of how to build
-	//AssemblersNeeded
+func (b Builder) String() string {
+	var buff bytes.Buffer
+	buff.WriteString(fmt.Sprintf("%s\t%s\t%s %d\n", strings.Repeat("\t", b.Level), b.Product.Name, b.AssemblerName, b.Num))
+	for _, b := range b.SubBuilders {
+		if b == nil {
+			continue
+		}
+		buff.WriteString(b.String())
+	}
+	return buff.String()
+}
+
+// BuildItemsPerSecond make  a buld for the item that produces n per second.
+func BuildItemsPerSecond(itemsPerSecond int64, item interface{}, minAssembler Assembler, level int) (*Builder, error) {
+	var toBuild Recipe
+
+	switch val := item.(type) {
+	case Item:
+		r, ok := data.Recipes[val.Name]
+		if !ok {
+			_, ok := data.Resources[val.Name]
+			if !ok {
+				return nil, fmt.Errorf("no recipe for item: %s", val.Name)
+			}
+			return nil, nil
+		}
+		toBuild = r
+	case Recipe:
+		toBuild = val
+	case string:
+		r, ok := data.Recipes[val]
+		if !ok {
+			_, ok := data.Resources[val]
+			if !ok {
+				return nil, fmt.Errorf("no recipe for item: %s", val)
+			}
+			return nil, nil
+		}
+		toBuild = r
+	default:
+		return nil, fmt.Errorf("type %T not supported", val)
+	}
+
+	if len(toBuild.Products) > 1 {
+		return nil, fmt.Errorf("only 1 product supported right now")
+	}
+
 	var b Builder
 	b.Assembler, b.AssemblerName = pickAssembler(toBuild, minAssembler)
 
-	if len(toBuild.Products) > 1 {
-		return nil, fmt.Errorf("Only 1 product supported right now.")
-	}
+	b.Level = level
 
+	b.Product = toBuild.Products[0]
+	//Need to add productivity
+	fmt.Printf("%s %v %v %v %v\n", b.Product.Name, itemsPerSecond, toBuild.TimeToCraft, toBuild.Products[0].Amount, b.Assembler.CraftingSpeed)
+	fmt.Printf("Makes: %d each time\n", b.Product.Amount)
+
+	b.Num = int(math.Round((float64(itemsPerSecond) * toBuild.TimeToCraft) / (float64(toBuild.Products[0].Amount) * b.Assembler.CraftingSpeed)))
+
+	for _, i := range toBuild.Ingredients {
+		subB, err := BuildItemsPerSecond(itemsPerSecond*i.Amount/b.Product.Amount, i.Name, minAssembler, level+1)
+		if err != nil {
+			return nil, err
+		}
+		b.SubBuilders = append(b.SubBuilders, subB)
+		b.Resources = append(b.Resources, &i)
+	}
 	return &b, nil
 }
 
@@ -214,7 +276,7 @@ func pickAssembler(toBuild Recipe, minAssembler Assembler) (Assembler, string) {
 	var usea Assembler
 	var name string
 	for key, a := range data.Assemblers {
-		fmt.Println(key, a.CraftingSpeed)
+		// fmt.Println(key, a.CraftingSpeed)
 		if len(toBuild.Ingredients) > int(a.IngredientCount) {
 			continue
 		}
