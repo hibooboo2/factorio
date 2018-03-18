@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	data     FactorioData
-	itemKeys []string
+	data            FactorioData
+	productToRecipe = make(map[string]string)
+	itemKeys        []string
 )
 
 func main() {
@@ -30,6 +31,9 @@ func main() {
 	for key := range data.Recipes {
 		if data.Items[key].Name == "" {
 			itemKeys = append(itemKeys, key)
+		}
+		for _, p := range data.Recipes[key].Products {
+			productToRecipe[p.Name] = key
 		}
 	}
 	for key := range data.Items {
@@ -152,6 +156,9 @@ type Builder struct {
 func (b Builder) String() string {
 	var buff bytes.Buffer
 	buff.WriteString(fmt.Sprintf("%s\t%s\t%s %d\n", strings.Repeat("\t", b.Level), b.Product.Name, b.AssemblerName, b.Num))
+	for _, i := range b.Resources {
+		buff.WriteString(fmt.Sprintf("%s\t%s %d", strings.Repeat("\t", b.Level), i.Name, i.Amount))
+	}
 	for _, b := range b.SubBuilders {
 		if b == nil {
 			continue
@@ -206,9 +213,17 @@ func BuildItemsPerSecond(itemsPerSecond int64, item interface{}, minAssembler As
 	fmt.Printf("%s %v %v %v %v\n", b.Product.Name, itemsPerSecond, toBuild.TimeToCraft, toBuild.Products[0].Amount, b.Assembler.CraftingSpeed)
 	fmt.Printf("Makes: %d each time\n", b.Product.Amount)
 
-	b.Num = int(math.Round((float64(itemsPerSecond) * toBuild.TimeToCraft) / (float64(toBuild.Products[0].Amount) * b.Assembler.CraftingSpeed)))
+	if b.Product.Amount == 0 {
+		b.Product.Amount = b.Product.AmountMin
+	}
+
+	b.Num = int(math.Round((float64(itemsPerSecond) * toBuild.TimeToCraft) / (float64(b.Product.Amount) * b.Assembler.CraftingSpeed)))
 
 	for _, i := range toBuild.Ingredients {
+		if i.Amount == 0 {
+			i.Amount = i.AmountMin
+		}
+
 		subB, err := BuildItemsPerSecond(itemsPerSecond*i.Amount/b.Product.Amount, i.Name, minAssembler, level+1)
 		if err != nil {
 			return nil, err
