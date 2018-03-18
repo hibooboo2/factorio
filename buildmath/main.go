@@ -82,6 +82,8 @@ func completer(d prompt.Document) []prompt.Suggest {
 		s = append(s, prompt.Suggest{Text: "recipes"})
 		s = append(s, prompt.Suggest{Text: "blueprint"})
 		s = append(s, prompt.Suggest{Text: "times"})
+		s = append(s, prompt.Suggest{Text: "exit"})
+		s = append(s, prompt.Suggest{Text: "quit"})
 	}
 
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
